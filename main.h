@@ -19,6 +19,11 @@ void DropPiece(int Board[][GRIDWIDTH], int Column, int Player);
 int GetOpponentPlayColumn(int Board[][GRIDWIDTH]);
 bool Any4InARow(int Board[][GRIDWIDTH], int Player, int* xs, int* ys, int* xi, int* yi);
 int HowManyRowsFilled(int Board[][GRIDWIDTH], int Column);
-int FindWinForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, int* BestCol, int* BestDepth, int Depth);
-bool RoomForOpponentWin(int Board[][GRIDWIDTH], int x, int y, int* HowManyPlays);
 bool IsTakeable(int Board[][GRIDWIDTH], int x, int y);
+
+// smart routines
+void BestMoveForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, 
+	int* ShortestWinMoves, int* BestColForShortestWin, 
+	int* ShortestLossMoves, int* BestColForShortestLoss,
+	int CurrentDepth, int* MovesSearched);
+bool CanOpponentMakeConnect4Here(int Board[][GRIDWIDTH], int x, int y, int* MovesNeeded);

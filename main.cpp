@@ -25,6 +25,7 @@ int main(int argc, const char* argv[])
 		bWon = Any4InARow(Board, OPPONENT, &xs, &ys, &xi, &yi);
 		if (bWon)
 		{
+			PrintGrid(Board);
 			printf("Opponent won!\n");
 			break;
 		}
@@ -126,9 +127,9 @@ bool Any4InARow(int Board[][GRIDWIDTH], int Player, int* xs, int* ys, int* xi, i
 	// from each spot, only look up and right
 	// since we're going to look up, make sure teh loop bounds are correct
 	int StartingValue = -1;
-	for (int y = 0; y < GRIDHEIGHT - 4; y++)
+	for (int y = 0; y <= GRIDHEIGHT - 4; y++)
 	{
-		for (int x = 0; x < GRIDWIDTH - 4; x++)
+		for (int x = 0; x <= GRIDWIDTH - 4; x++)
 		{
 			int v = Board[y][x];
 			if (StartingValue == -1)
@@ -225,15 +226,148 @@ int HowManyRowsFilled(int Board[][GRIDWIDTH], int Column)
 	return 4;
 }
 
-int FindWinForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, int* BestCol, int * BestDepth, int Depth)
+bool IsTakeable(int Board[][GRIDWIDTH], int x, int y)
 {
-	*BestCol = -1;
-	if (Depth >= 5)
+	if (Board[y][x] != 0) return false;
+	// the space is empty
+	if (y == 0) return true;
+	if (Board[y - 1][x] == 0) return false;
+	return true;
+}
+
+bool CanOpponentMakeConnect4Here(int Board[][GRIDWIDTH], int x, int y, int* MovesNeeded)
+{
+	// each spot has to be taken by opponent, or choosable.
+	*MovesNeeded = -1;
+	int BestMovesNeeded = 5;
+
+	int OpponentCount = 0;
+	if (Board[y][x] == USER)
 	{
-		return 0; // too deep, who knows
+		return false;
+	}
+	if (Board[y][x] == OPPONENT)
+	{
+		OpponentCount = 1;
+	}
+	if (!IsTakeable(Board, x, y))
+	{
+		return false;
+	}
+
+	//											  /   ^
+	//                                           /    |
+	// go look in 3 directions from start --->  /     |
+
+	// look up
+
+	bool bFoundUser = false;
+	
+	for (int len = 1; len <= 3; len++)
+	{
+		int v2 = Board[y + len][x];
+		if (v2 == USER)
+		{
+			bFoundUser = true;
+			break;
+		}
+		if (v2 == OPPONENT)
+		{
+			OpponentCount++;
+		}
+	}
+
+	if (!bFoundUser)
+	{
+		int RemainingPlays = 4 - OpponentCount;
+		if (RemainingPlays < BestMovesNeeded)
+		{
+			BestMovesNeeded = RemainingPlays;
+		}
+	}
+
+	// look diagnonal up
+
+	bFoundUser = false;
+
+	for (int len = 1; len <= 3; len++)
+	{
+		int v2 = Board[y + len][x + len];
+		if (v2 == USER)
+		{
+			bFoundUser = true;
+			break;
+		}
+		if (v2 == OPPONENT)
+		{
+			OpponentCount++;
+		}
+	}
+
+	if (!bFoundUser)
+	{
+		int RemainingPlays = 4 - OpponentCount;
+		if (RemainingPlays < BestMovesNeeded)
+		{
+			BestMovesNeeded = RemainingPlays;
+		}
+	}
+
+	// look right
+
+	bFoundUser = false;
+
+	for (int len = 1; len <= 3; len++)
+	{
+		int v2 = Board[y][x + len];
+		if (v2 == USER)
+		{
+			bFoundUser = true;
+			break;
+		}
+		if (v2 == OPPONENT)
+		{
+			OpponentCount++;
+		}
+	}
+
+	if (!bFoundUser)
+	{
+		int RemainingPlays = 4 - OpponentCount;
+		if (RemainingPlays < BestMovesNeeded)
+		{
+			BestMovesNeeded = RemainingPlays;
+		}
+	}
+
+	*MovesNeeded = BestMovesNeeded;
+	if (BestMovesNeeded > 4)
+	{
+		return false;
+	}
+
+	return true;
+}
+
+// only the two following functions have any brains in them...
+
+// recursive function. Can be called to make a play for USER or OPPONENT. It's point is to find:
+// 1: shortest path to a win for OPPONENT without USER winning first
+//		If there is an immediate win, take it!
+//		If there is a win in 2 moves and every other path is a non-result or takes longer, take the shortest path to the win
+// 2: shortest path to the USER winning.
+void BestMoveForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, 
+	int* ShortestWinMoves, int* BestColForShortestWin,
+	int* ShortestLossMoves, int* BestColForShortestLoss,
+	int CurrentDepth, int* MovesSearched)
+{
+	if (CurrentDepth > 4 * 2) // both players move 4 times
+	{
+		return; // not sure who wins, too far ahead
 	}
 
 	// is there an immediate win at this depth?
+
 	for (int x = 0; x < GRIDWIDTH; x++)
 	{
 		int rowsFilled = HowManyRowsFilled(Board, x);
@@ -241,14 +375,31 @@ int FindWinForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, int* B
 		{
 			continue;
 		}
+		*MovesSearched = *MovesSearched + 1;
+
 		Board[rowsFilled][x] = WhichPlayer;
 		int xs, ys, xi, yi;
 		bool Any4 = Any4InARow(Board, WhichPlayer, &xs, &ys, &xi, &yi);
 		Board[rowsFilled][x] = 0; // unset it
 		if (Any4)
 		{
-			*BestCol = x;
-			return WhichPlayer;
+			if (WhichPlayer == OPPONENT)
+			{
+				if (*BestColForShortestWin == -1)
+				{
+					*ShortestWinMoves = CurrentDepth;
+					*BestColForShortestWin = x;
+				}
+			}
+			else
+			{
+				if (*BestColForShortestLoss == -1)
+				{
+					*ShortestLossMoves = CurrentDepth;
+					*BestColForShortestLoss = x;
+				}
+			}
+			return;
 		}
 	}
 
@@ -272,151 +423,15 @@ int FindWinForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, int* B
 
 		int BoardCopy[GRIDHEIGHT][GRIDWIDTH];
 		memcpy(BoardCopy, Board, GRIDHEIGHT * GRIDWIDTH * sizeof(int));
-		BoardCopy[rowsFilled][x] = WhichPlayer;
+		BoardCopy[rowsFilled][x] = Other;
 
-		int won = FindWinForOpponent(BoardCopy, Other, BestCol, BestDepth, Depth + 1);
-		if (won != 0)
-		{
-			if (won == OPPONENT)
-			{
-				if (Depth == 0)
-				{
-					*BestCol = x;
-				}
-				return won;
-			}
-			else
-			{
-				// the largest depth at which user wins is our best column to pick. Unless we can
-				// find a scenario where user doesn't win.
-				*BestCol = x;
-			}
-		}
-		else
-		{
-			// user did not win in this scenario. reset best column to pick, to this one.
-			*BestCol = x;
-		}
+		BestMoveForOpponent(BoardCopy, Other, 
+			ShortestWinMoves, BestColForShortestWin, 
+			ShortestLossMoves, BestColForShortestLoss,
+			CurrentDepth + 1, MovesSearched);
 	}
 
-	return 0;
-}
-
-bool IsTakeable(int Board[][GRIDWIDTH], int x, int y)
-{
-	if (Board[y][x] != 0) return false;
-	// the space is empty
-	if (y == 0) return true;
-	if (Board[y - 1][x] == 0) return false;
-	return true;
-}
-
-bool RoomForOpponentWin(int Board[][GRIDWIDTH], int x, int y, int* HowManyPlays)
-{
-	// each spot has to be taken by opponent, or choosable.
-	*HowManyPlays = -1;
-	int BestHowManyPlays = 5;
-
-	int OpponentCount = 0;
-	if (Board[y][x] == USER)
-	{
-		return false;
-	}
-	if (Board[y][x] == OPPONENT)
-	{
-		OpponentCount = 1;
-	}
-	if( !IsTakeable( Board, x, y ) )
-	{
-		return false;
-	}
-
-	// go look in 3 directions from start
-
-	// look up
-
-	bool bFoundUser = false;
-
-	for (int len = 1; len <= 3; len++)
-	{
-		int v2 = Board[y + len][x];
-		if (v2 == USER)
-		{
-			bFoundUser = true;
-			break;
-		}
-		if (v2 == OPPONENT)
-		{
-			OpponentCount++;
-		}
-	}
-
-	if (!bFoundUser)
-	{
-		int RemainingPlays = 4 - OpponentCount;
-		if (RemainingPlays < BestHowManyPlays)
-		{
-			BestHowManyPlays = RemainingPlays;
-		}
-	}
-
-	bFoundUser = false;
-
-	for (int len = 1; len <= 3; len++)
-	{
-		int v2 = Board[y + len][x + len];
-		if (v2 == USER)
-		{
-			bFoundUser = true;
-			break;
-		}
-		if (v2 == OPPONENT)
-		{
-			OpponentCount++;
-		}
-	}
-
-	if (!bFoundUser)
-	{
-		int RemainingPlays = 4 - OpponentCount;
-		if (RemainingPlays < BestHowManyPlays)
-		{
-			BestHowManyPlays = RemainingPlays;
-		}
-	}
-
-	bFoundUser = false;
-
-	for (int len = 1; len <= 3; len++)
-	{
-		int v2 = Board[y][x + len];
-		if (v2 == USER)
-		{
-			bFoundUser = true;
-			break;
-		}
-		if (v2 == OPPONENT)
-		{
-			OpponentCount++;
-		}
-	}
-
-	if (!bFoundUser)
-	{
-		int RemainingPlays = 4 - OpponentCount;
-		if (RemainingPlays < BestHowManyPlays)
-		{
-			BestHowManyPlays = RemainingPlays;
-		}
-	}
-
-	*HowManyPlays = BestHowManyPlays;
-	if (BestHowManyPlays > 4 )
-	{
-		return false;
-	}
-
-	return true;
+	return;
 }
 
 int GetOpponentPlayColumn(int Board[][GRIDWIDTH])
@@ -427,16 +442,60 @@ int GetOpponentPlayColumn(int Board[][GRIDWIDTH])
 	// 3. Pick one that sets up a future line
 	// we can do this with repeated simulations, each time picking a different column for the user to move, and finding which is the best one
 
-	int BestDepth = 0;
-	int ColToPick = -1;
-	int winner = FindWinForOpponent(Board, OPPONENT, &ColToPick, &BestDepth, 0);
-	if (ColToPick != -1)
+	int ShortestWinMoves = GRIDWIDTH * GRIDHEIGHT;
+	int BestColShortestWin = -1;
+	int MovesSearched = 0;
+	int ShortestLossMoves = GRIDWIDTH * GRIDHEIGHT;
+	int BestColShortestLoss = -1;
+	BestMoveForOpponent(Board, OPPONENT, 
+		&ShortestWinMoves, &BestColShortestWin, 
+		&ShortestLossMoves, &BestColShortestLoss,
+		0, &MovesSearched);
+	printf("Searched %d moves\n", MovesSearched);
+	if (ShortestWinMoves < 9)
 	{
-		return ColToPick;
+		printf("ShortestWinMoves = %d @ col %d\n", ShortestWinMoves, BestColShortestWin);
+	}
+	if (ShortestLossMoves < 9)
+	{
+		printf("ShortestLossMoves = %d @ col %d\n", ShortestLossMoves, BestColShortestLoss);
 	}
 
+	if (BestColShortestWin != -1 && BestColShortestLoss != -1)
+	{
+		// pick the move that blocks the loss, over the move
+		// that gets us the win.
+
+		if (ShortestWinMoves < ShortestLossMoves)
+		{
+			printf("ShortestWinMoves is smallest, Opponent is chosing for the win at col %d\n", BestColShortestWin);
+			return BestColShortestWin;
+		}
+		else
+		{
+			printf("ShortestLossMoves is smallest, Opponent is chosing for the block at col %d\n", BestColShortestLoss);
+			return BestColShortestLoss;
+		}
+	}
+
+	// if there is no loss blocker, pick the win, if there is one
+	//
+	if (BestColShortestWin != -1)
+	{
+		printf("There is no loss blocker, so choosing shortest win path @ col %d\n", BestColShortestWin);
+		return BestColShortestWin;
+	}
+
+	if (BestColShortestLoss != -1)
+	{
+		printf("There is no winning move in sight, so choosing shortest blocker @ col %d\n", BestColShortestLoss);
+		return BestColShortestLoss;
+	}
+
+	printf("Choosing a spot at random?\n");
+
 	// winner unclear in the near future
-	// use some kind of strategy
+	// use some kind of strategy?
 	// find a piece on the board we already played. If there are 3 pieces in any direction from it that are played by OPPONENT or are open,
 	// go pick them preferentially.
 
@@ -450,7 +509,7 @@ int GetOpponentPlayColumn(int Board[][GRIDWIDTH])
 			continue;
 
 		int PlaysToWin = 0;
-		bool room = RoomForOpponentWin(Board, i, rowsfilled, &PlaysToWin);
+		bool room = CanOpponentMakeConnect4Here(Board, i, rowsfilled, &PlaysToWin);
 		if (room)
 		{
 			if (PlaysToWin < MinPlaysToWin)
