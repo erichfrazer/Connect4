@@ -4,26 +4,31 @@
 #include <conio.h>
 #include <stdlib.h>
 
-#define USER 1
+#define HUMAN 1
 #define OPPONENT 2
 #define GRIDWIDTH 8
 #define GRIDHEIGHT 6
+#define LOOKAHEAD_MOVES 8
 
-int Board[GRIDHEIGHT][GRIDWIDTH] = { 0 };
+char TheBoard[GRIDHEIGHT][GRIDWIDTH] = { 0 };
 int PiecesPlaced = 0;
 int Round = 1;
 
-void PrintGrid(int Board[][GRIDWIDTH]);
-int GetUserPlayColumn(int Board[][GRIDWIDTH]);
-void DropPiece(int Board[][GRIDWIDTH], int Column, int Player);
-int GetOpponentPlayColumn(int Board[][GRIDWIDTH]);
-bool Any4InARow(int Board[][GRIDWIDTH], int Player, int* xs, int* ys, int* xi, int* yi);
-int HowManyRowsFilled(int Board[][GRIDWIDTH], int Column);
-bool IsTakeable(int Board[][GRIDWIDTH], int x, int y);
+void PrintGrid(char Board[][GRIDWIDTH]);
+int GetUserPlayColumn(char Board[][GRIDWIDTH]);
+void DropPiece(char Board[][GRIDWIDTH], int Column, int Player);
+int GetOpponentPlayColumn(char Board[][GRIDWIDTH]);
+bool Any4InARow(char Board[][GRIDWIDTH], int Player, bool MarkIfWin);
+int HowManyRowsFilled(char Board[][GRIDWIDTH], int Column);
+bool IsTakeable(char Board[][GRIDWIDTH], int x, int y);
+int GetOtherPlayer(int WhichPlayer);
 
 // smart routines
-void BestMoveForOpponent(int Board[GRIDHEIGHT][GRIDWIDTH], int WhichPlayer, 
-	int* ShortestWinMoves, int* BestColForShortestWin, 
-	int* ShortestLossMoves, int* BestColForShortestLoss,
+bool TryRecursiveMove(
+	char Board[GRIDHEIGHT][GRIDWIDTH], 
+	int WhichPlayer, 
+	int* PathTaken,
+	int* ShortestWinMoves, char* LookaheadWinMoves,
+	int* LongestLossMoves, char* LookaheadLossMoves,
 	int CurrentDepth, int* MovesSearched);
-bool CanOpponentMakeConnect4Here(int Board[][GRIDWIDTH], int x, int y, int* MovesNeeded);
+bool CanOpponentMakeConnect4Here(char Board[][GRIDWIDTH], int x, int y, int* MovesNeeded);
