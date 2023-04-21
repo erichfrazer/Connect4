@@ -3,32 +3,52 @@
 #include <string.h>
 #include <conio.h>
 #include <stdlib.h>
+#include <assert.h>
 
-#define HUMAN 1
-#define OPPONENT 2
+typedef enum
+{
+	EMPTY = 0,
+	HUMAN,
+	OPPONENT,
+	HUMAN_WON,
+	OPPONENT_WON
+} PlayerType;
+
+typedef struct _ColStats
+{
+	int MovesTillWin;
+	int MovesTillLoss;
+	int TotalWins;
+	int TotalLosses;
+} ColStats;
+
 #define GRIDWIDTH 8
 #define GRIDHEIGHT 6
 #define LOOKAHEAD_MOVES 8
 
-char TheBoard[GRIDHEIGHT][GRIDWIDTH] = { 0 };
-int PiecesPlaced = 0;
+PlayerType TheBoard[GRIDHEIGHT][GRIDWIDTH];
 int Round = 1;
 
-void PrintGrid(char Board[][GRIDWIDTH]);
-int GetUserPlayColumn(char Board[][GRIDWIDTH]);
-void DropPiece(char Board[][GRIDWIDTH], int Column, int Player);
-int GetOpponentPlayColumn(char Board[][GRIDWIDTH]);
-bool Any4InARow(char Board[][GRIDWIDTH], int Player, bool MarkIfWin);
-int HowManyRowsFilled(char Board[][GRIDWIDTH], int Column);
-bool IsTakeable(char Board[][GRIDWIDTH], int x, int y);
-int GetOtherPlayer(int WhichPlayer);
+void PrintGrid(PlayerType Board[][GRIDWIDTH]);
+void SmallPrintGrid(PlayerType Board[][GRIDWIDTH]);
+int GetUserPlayColumn(PlayerType Board[][GRIDWIDTH]);
+void DropPiece(PlayerType Board[][GRIDWIDTH], int Column, PlayerType Player);
+int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH]);
+PlayerType Any4InARow(PlayerType Board[][GRIDWIDTH], bool MarkIfWin, int* xStart, int* yStart, int* xDir, int* yDir);
+int HowManyRowsFilled(PlayerType Board[][GRIDWIDTH], int Column);
+bool IsTakeable(PlayerType Board[][GRIDWIDTH], int x, int y);
+PlayerType GetOtherPlayer(PlayerType WhichPlayer);
+int BlockingMoveToPreventHumanWin(PlayerType Board[][GRIDWIDTH], int PathToHumanWin[LOOKAHEAD_MOVES], int MovesLen);
 
 // smart routines
-bool TryRecursiveMove(
-	char Board[GRIDHEIGHT][GRIDWIDTH], 
-	int WhichPlayer, 
-	int* PathTaken,
-	int* ShortestWinMoves, char* LookaheadWinMoves,
-	int* LongestLossMoves, char* LookaheadLossMoves,
-	int CurrentDepth, int* MovesSearched);
-bool CanOpponentMakeConnect4Here(char Board[][GRIDWIDTH], int x, int y, int* MovesNeeded);
+void TryRecursiveColumn(
+	PlayerType Board[GRIDHEIGHT][GRIDWIDTH], 
+	PlayerType WhichPlayer,
+	int Column,
+	int PathTaken[LOOKAHEAD_MOVES],
+	int* ShortestWinMoves, int LookaheadWinMoves[LOOKAHEAD_MOVES],
+	int* ShortestLossMoves, int LookaheadShortestLossMoves[LOOKAHEAD_MOVES],
+	ColStats ColStats[GRIDWIDTH],
+	int CurrentDepth, 
+	int* MovesSearched);
+bool CanOpponentMakeConnect4Here(PlayerType Board[][GRIDWIDTH], int x, int y, int* MovesNeeded);
