@@ -16,8 +16,6 @@ typedef enum
 
 typedef struct _ColStats
 {
-	int MovesTillWin;
-	int MovesTillLoss;
 	int TotalWins;
 	int TotalLosses;
 } ColStats;
@@ -45,9 +43,6 @@ void TryRecursiveColumn(
 	PlayerType Board[GRIDHEIGHT][GRIDWIDTH], 
 	PlayerType WhichPlayer,
 	int Column,
-	int PathTaken[LOOKAHEAD_MOVES],
-	int* ShortestWinMoves, int LookaheadWinMoves[LOOKAHEAD_MOVES],
-	int* ShortestLossMoves, int LookaheadShortestLossMoves[LOOKAHEAD_MOVES],
 	ColStats ColStats[GRIDWIDTH],
 	int CurrentDepth, 
 	int* MovesSearched);

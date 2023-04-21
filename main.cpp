@@ -717,9 +717,6 @@ void TryRecursiveColumn(
 	PlayerType Board[GRIDHEIGHT][GRIDWIDTH], 
 	PlayerType WhichPlayer,
 	int Column,
-	int PathTaken[LOOKAHEAD_MOVES],
-	int* ShortestWinMoves, int LookaheadWinMoves[LOOKAHEAD_MOVES],
-	int* ShortestLossMoves, int LookaheadShortestLossMoves[LOOKAHEAD_MOVES],
 	ColStats colStats[GRIDWIDTH],
 	int CurrentDepth,
 	int* MovesSearched)
@@ -756,75 +753,44 @@ void TryRecursiveColumn(
 		// mark that we went this way. Keep a breadcrumb trail of where we went.
 
 		assert(CurrentDepth <= LOOKAHEAD_MOVES);
-		PathTaken[CurrentDepth] = x;
 
 		PlayerType WhoWon = Any4InARow(BoardCopy, false, NULL, NULL, NULL, NULL);
 
 		int CurrentDepthMoves = CurrentDepth + 1;
 
+		ColStats colStatsLocal[GRIDWIDTH] = { 0 };
+
 		if (WhoWon == OPPONENT)
 		{
-			if (CurrentDepthMoves < *ShortestWinMoves)
-			{
-				printf("Shortest win = %d\n", CurrentDepthMoves);
-				SmallPrintGrid(BoardCopy);
-
-				assert(CurrentDepthMoves <= LOOKAHEAD_MOVES);
-				*ShortestWinMoves = CurrentDepthMoves;
-				for (int i = 0; i < LOOKAHEAD_MOVES; i++)
-				{
-					LookaheadWinMoves[i] = PathTaken[i];
-				}
-			}
-			colStats[x].TotalWins++;
-			BoardCopy[rowsFilled][x] = EMPTY;
-			PathTaken[CurrentDepth] = -1;
-			continue; // don't test any deeper, this is a final win
+			colStatsLocal[x].TotalWins++;
 		}
 		else if (WhoWon == HUMAN)
 		{
-			if (CurrentDepthMoves < *ShortestLossMoves)
-			{
-				printf("Shortest loss = %d\n", CurrentDepthMoves);
-				SmallPrintGrid(BoardCopy);
-
-				assert(CurrentDepthMoves <= LOOKAHEAD_MOVES);
-				*ShortestLossMoves = CurrentDepthMoves;
-				for (int i = 0; i < LOOKAHEAD_MOVES; i++)
-				{
-					LookaheadShortestLossMoves[i] = PathTaken[i];
-				}
-			}
-			colStats[x].TotalLosses++;
-			BoardCopy[rowsFilled][x] = EMPTY;
-			PathTaken[CurrentDepth] = -1;
-			continue; // don't test any deeper, this is a final win
+			colStatsLocal[x].TotalLosses++;
+		}
+		else
+		{
+			TryRecursiveColumn(
+				BoardCopy,
+				OtherPlayer,
+				x,
+				colStatsLocal,
+				CurrentDepth + 1, MovesSearched);
 		}
 
-		ColStats colStatsLocal[GRIDWIDTH] = { 0 };
+		// add our local totals to the parent's totals
 
-		TryRecursiveColumn(
-			BoardCopy,
-			OtherPlayer,
-			x,
-			PathTaken,
-			ShortestWinMoves, LookaheadWinMoves,
-			ShortestLossMoves, LookaheadShortestLossMoves,
-			colStatsLocal,
-			CurrentDepth + 1, MovesSearched);
-
-		colStats[Column].TotalLosses += colStatsLocal[x].TotalLosses;
-		colStats[Column].TotalWins += colStatsLocal[x].TotalWins;
-
-		if (CurrentDepth == 0)
+		if (CurrentDepth != 0)
 		{
-			colStats[x].MovesTillLoss = *ShortestLossMoves;
-			colStats[x].MovesTillWin = *ShortestWinMoves;
+			colStats[Column].TotalLosses += colStatsLocal[x].TotalLosses;
+			colStats[Column].TotalWins += colStatsLocal[x].TotalWins;
+		}
+		else
+		{
+			colStats[x] = colStatsLocal[x];
 		}
 
 		BoardCopy[rowsFilled][x] = EMPTY;
-		PathTaken[CurrentDepth] = -1;
-
 	}
 
 	return;
@@ -832,147 +798,33 @@ void TryRecursiveColumn(
 
 int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
 {
-	// computer has to pick a column to go in...
-	// 1. Pick any that will result in an immediate win.
-	// 2. Pick one that will not result in next move for user to be an immediate win
-	// 3. Pick one that sets up a future line
-	// we can do this with repeated simulations, each time picking a different column for the user to move, and finding which is the best one
-	int LookaheadWinMoves[LOOKAHEAD_MOVES];
-	int LookaheadShortestLossMoves[LOOKAHEAD_MOVES];
-	int PathTaken[LOOKAHEAD_MOVES];
-
-	for (int i = 0; i < LOOKAHEAD_MOVES; i++)
-	{
-		LookaheadWinMoves[i] = -1;
-		LookaheadShortestLossMoves[i] = -1;
-		PathTaken[i] = -1;
-	}
-
 	ColStats ColStats[GRIDWIDTH] = { 0 };
 
 	int MovesSearched = 0;
-	int ShortestWinMoves = GRIDWIDTH * GRIDHEIGHT;
-	int ShortestLossMoves = GRIDWIDTH * GRIDHEIGHT;
 
 	TryRecursiveColumn(
 		Board,
 		OPPONENT,
-		-1,
-		PathTaken,
-		&ShortestWinMoves, LookaheadWinMoves,
-		&ShortestLossMoves, LookaheadShortestLossMoves,
+		0,
 		ColStats,
 		0,
 		&MovesSearched);
 
 	printf("Searched %d moves\n\n", MovesSearched);
 
-	// try NOT to use a move that is along a loss-path
+	// which column has the best stats?
+	float bestwinratio = 0;
+	int bestcol = -1;
 
-	int BestColShortestWin = -1;
-	if (ShortestWinMoves <= LOOKAHEAD_MOVES)
+	for (int c = 0; c < GRIDWIDTH; c++)
 	{
-		BestColShortestWin = LookaheadWinMoves[0];
-
-		printf("shortest win in %d moves\n", ShortestWinMoves);
-
-		for (int i = 0; i < ShortestWinMoves; i++)
+		float winratio = ColStats[c].TotalWins / (float)ColStats[c].TotalLosses;
+		if (winratio > bestwinratio)
 		{
-			if (i % 2 == 0)
-				printf("Opponent col: %d\n", LookaheadWinMoves[i] + 1);
-			else
-				printf("Player col: %d\n", LookaheadWinMoves[i] + 1);
-		}
-		printf("\n");
-	}
-
-	int BestColShortestLoss = -1;
-	if (ShortestLossMoves <= LOOKAHEAD_MOVES)
-	{
-		BestColShortestLoss = LookaheadShortestLossMoves[0];
-
-		printf("shortest loss in %d moves\n", ShortestLossMoves);
-
-		for (int i = 0; i < ShortestLossMoves; i++)
-		{
-			if (i % 2 == 0)
-				printf("Opponent col: %d\n", LookaheadShortestLossMoves[i] + 1);
-			else
-				printf("Player col: %d\n", LookaheadShortestLossMoves[i] + 1);
-		}
-		printf("\n");
-	}
-
-	bool bUseShortestWin = false;
-	bool bUseShortestLoss = false;
-
-	if (BestColShortestWin != -1)
-	{
-		if (BestColShortestLoss == -1)
-		{
-			bUseShortestWin = true;
-		}
-		else
-		{
-			if (ShortestWinMoves < ShortestLossMoves)
-			{
-				bUseShortestWin = true;
-			}
+			bestwinratio = winratio;
+			bestcol = c;
 		}
 	}
-
-	// can't use shortest win. Choose any path except for a path that leads to a loss
-	// we can employ "strategy" if we are allowed to pick 'anything'...
-	bool AvoidCol[GRIDWIDTH] = { 0 };
-	if (BestColShortestLoss != -1)
-	{
-		AvoidCol[BestColShortestLoss] = true;
-	}
-
-	int MovesAvail = 0;
-	for (int i = 0; i < GRIDWIDTH; i++)
-	{
-		if (AvoidCol[i]) continue;
-		int rowsFilled = HowManyRowsFilled(Board, i);
-		if (rowsFilled == GRIDHEIGHT)
-		{
-			AvoidCol[i] = true;
-			continue;
-		}
-		MovesAvail++;
-	}
-
-	if (MovesAvail == 0)
-	{
-		// we HAVE to choose one along the path of a loss.
-		printf("Opponent HAS to use a path that leads to a loss. No other moves.\n");
-		return BestColShortestLoss;
-	}
-
-	printf("Choosing a spot at random?\n");
-
-	// pick the one that has the longest path to a loss
-	// this involves no strategy.
-	
-	int LongestPathToLoss = 0;
-	int BestColForLongestPathToLoss = -1;
-	for (int i = 0; i < GRIDWIDTH; i++)
-	{
-		if (ColStats[i].MovesTillLoss > LongestPathToLoss)
-		{
-			BestColForLongestPathToLoss = i;
-			LongestPathToLoss = i;
-		}
-	}
-	// pick a longest path to loss at random
-	int r;
-	while (true)
-	{
-		r = rand() % GRIDWIDTH;
-		if (ColStats[r].MovesTillLoss != LongestPathToLoss) continue;
-		break;
-	}
-
-	return r;
+	return bestcol;
 }
 
