@@ -82,25 +82,6 @@ const char* PieceString[5][5] = {
 	}
 };
 
-void SmallPrintGrid(PlayerType Board[][GRIDWIDTH])
-{
-	for (int y = GRIDHEIGHT - 1; y >= 0; y--)
-	{
-		for (int x = 0; x < GRIDWIDTH; x++)
-		{
-			int v = Board[y][x];
-			if (v == HUMAN) printf("H");
-			if (v == OPPONENT) printf("O");
-			if (v == HUMAN_WON) printf("X");
-			if (v == OPPONENT_WON) printf("X");
-			if (v == EMPTY) printf(".");
-		}
-
-		printf("\n");
-	}
-	printf("\n");
-}
-
 void PrintGrid(PlayerType Board[][GRIDWIDTH])
 {
 	printf("\n");
@@ -323,395 +304,16 @@ bool IsTakeable(PlayerType Board[][GRIDWIDTH], int x, int y)
 	return true;
 }
 
-bool CanOpponentMakeConnect4Here(PlayerType Board[][GRIDWIDTH], int x, int y, int* MovesNeeded)
-{
-	// each spot has to be taken by opponent, or choosable.
-	*MovesNeeded = -1;
-	int BestMovesNeeded = 5;
-
-	int OpponentCount = 0;
-	if (Board[y][x] == HUMAN)
-	{
-		return false;
-	}
-	if (Board[y][x] == OPPONENT)
-	{
-		OpponentCount = 1;
-	}
-	if (!IsTakeable(Board, x, y))
-	{
-		return false;
-	}
-
-	//											  /   ^
-	//                                           /    |
-	// go look in 3 directions from start --->  /     |
-
-	// look up
-
-	bool bFoundUser = false;
-	
-	for (int len = 1; len <= 3; len++)
-	{
-		PlayerType v2 = Board[y + len][x];
-		if (v2 == HUMAN)
-		{
-			bFoundUser = true;
-			break;
-		}
-		if (v2 == OPPONENT)
-		{
-			OpponentCount++;
-		}
-	}
-
-	if (!bFoundUser)
-	{
-		int RemainingPlays = 4 - OpponentCount;
-		if (RemainingPlays < BestMovesNeeded)
-		{
-			BestMovesNeeded = RemainingPlays;
-		}
-	}
-
-	// look diagnonal up
-
-	bFoundUser = false;
-
-	for (int len = 1; len <= 3; len++)
-	{
-		PlayerType v2 = Board[y + len][x + len];
-		if (v2 == HUMAN)
-		{
-			bFoundUser = true;
-			break;
-		}
-		if (v2 == OPPONENT)
-		{
-			OpponentCount++;
-		}
-	}
-
-	if (!bFoundUser)
-	{
-		int RemainingPlays = 4 - OpponentCount;
-		if (RemainingPlays < BestMovesNeeded)
-		{
-			BestMovesNeeded = RemainingPlays;
-		}
-	}
-
-	// look right
-
-	bFoundUser = false;
-
-	for (int len = 1; len <= 3; len++)
-	{
-		PlayerType v2 = Board[y][x + len];
-		if (v2 == HUMAN)
-		{
-			bFoundUser = true;
-			break;
-		}
-		if (v2 == OPPONENT)
-		{
-			OpponentCount++;
-		}
-	}
-
-	if (!bFoundUser)
-	{
-		int RemainingPlays = 4 - OpponentCount;
-		if (RemainingPlays < BestMovesNeeded)
-		{
-			BestMovesNeeded = RemainingPlays;
-		}
-	}
-
-	*MovesNeeded = BestMovesNeeded;
-	if (BestMovesNeeded > 4)
-	{
-		return false;
-	}
-
-	return true;
-}
-
 PlayerType GetOtherPlayer(PlayerType WhichPlayer)
 {
 	if (WhichPlayer == HUMAN) return OPPONENT;
 	return HUMAN;
 }
 
-// entirely deterministic. No AI
-int BlockingMoveToPreventHumanWin(PlayerType Board[][GRIDWIDTH], int PathToHumanWin[LOOKAHEAD_MOVES], int MovesLen)
-{
-	int xStart = -1;
-	int yStart = -1;
-	int xDir = -1;
-	int yDir = -1;
-	{
-		PlayerType BoardCopy[GRIDHEIGHT][GRIDWIDTH];
-		memcpy(BoardCopy, Board, GRIDHEIGHT * GRIDWIDTH * sizeof(PlayerType));
-
-		for (int i = 0; i < MovesLen; i++)
-		{
-			PlayerType pt = i % 2 == 0 ? OPPONENT : HUMAN;
-			int col = PathToHumanWin[i];
-			int rowsFilled = HowManyRowsFilled(BoardCopy, col);
-			BoardCopy[rowsFilled][col] = pt;
-		}
-
-		PlayerType win = Any4InARow(BoardCopy, false, &xStart, &yStart, &xDir, &yDir);
-		assert(win != EMPTY);
-	}
-
-	// how many human pieces are already set? choose a location closest to an already placed piece for the block
-	// X... = XO..
-	// X.X. = XOX.
-	// X..X = XO.X
-	// XX.. = XXO.
-	// ..XX = .OXX
-	// X.XX = XOXX
-	// XXX. = XXXO (and in danger of an immediate win on the other side?)
-	// and so on
-
-	int xs = xStart;
-	int ys = yStart;
-	int humanCount = 0;
-	int HumanLocX[4];
-	int HumanLocY[4];
-	int LineLocX[4];
-	int LineLocY[4];
-	bool HasHuman[4] = { 0 };
-	int LeastDeltaBetweenHumanMoves = 4;
-	int LastHumanLoc = -1;
-	for (int i = 0; i < 4; i++)
-	{
-		PlayerType pt = Board[ys][xs];
-		if (pt == HUMAN)
-		{
-			if (LastHumanLoc == -1)
-			{
-				LastHumanLoc = i;
-			}
-			int delta = i - LastHumanLoc;
-			if (delta != 0)
-			{
-				if (delta < LeastDeltaBetweenHumanMoves)
-				{
-					LeastDeltaBetweenHumanMoves = delta;
-				}
-			}
-			HumanLocX[humanCount] = xs;
-			HumanLocY[humanCount] = ys;
-			HasHuman[i] = Board[ys][xs];
-			if (HasHuman[i])
-			{
-				humanCount++;
-			}
-		}
-		LineLocX[i] = xs;
-		LineLocY[i] = ys;
-		xs += xDir;
-		ys += yDir;
-	}
-
-	printf("Find block, human win starts at %d, %d, goes dir %d, %d, and has %d pieces placed so far.\n",
-		xStart + 1, yStart + 1,
-		xDir, yDir,
-		humanCount);
-
-	int UseSpot = -1;
-
-	// if humancount = 1, place it next to the human
-	// if humancount = 2, place it between in the middle of the two unless you can't
-	// if humancount = 3, then place it in the empty spot
-	// if humancount = 4, why are we running this?
-	assert(humanCount != 4);
-	switch (humanCount)
-	{
-	case 0:
-		assert(false);
-		break;
-	case 4:
-		assert(false);
-		break;
-	case 1:
-		if (HasHuman[0])
-		{
-			assert(IsTakeable(Board, LineLocX[1], LineLocY[1]));
-			printf("There are 1 human pieces at %d, so picking col %d\n", LineLocX[0] + 1, LineLocX[1] + 1);
-			UseSpot = 1;
-			break;
-		}
-		else if (HasHuman[3])
-		{
-			assert(IsTakeable(Board, LineLocX[2], LineLocY[2]));
-			printf("There are 1 human pieces at %d, so picking col %d\n", LineLocX[2] + 1, LineLocX[2] + 1);
-			UseSpot = 2;
-			break;
-		}
-		else if( HasHuman[1])
-		{
-			// choose spot 0 or 2
-			if (IsTakeable(Board, LineLocX[0], LineLocY[0]))
-			{
-				printf("There are 1 human pieces at %d, so picking col %d\n", LineLocX[1] + 1, LineLocX[0] + 1);
-				UseSpot = 0;
-			}
-			else if (IsTakeable(Board, LineLocX[2], LineLocY[2]))
-			{
-				printf("There are 1 human pieces at %d, so picking col %d\n", LineLocX[1] + 1, LineLocX[2] + 1);
-				UseSpot = 2;
-			}
-			else
-			{
-				assert(false);
-			}
-			break;
-		}
-		else
-		{
-			// at spot 2
-			// choose spot 1 or 3
-			if (IsTakeable(Board, LineLocX[1], LineLocY[1]))
-			{
-				printf("There are 1 human pieces at %d, so picking col %d\n", LineLocX[2] + 1, LineLocX[1] + 1);
-				UseSpot = 1;
-			}
-			else if (IsTakeable(Board, LineLocX[3], LineLocY[3]))
-			{
-				printf("There are 1 human pieces at %d, so picking col %d\n", LineLocX[2] + 1, LineLocX[3] + 1);
-				UseSpot = 3;
-			}
-			else
-			{
-				assert(false);
-			}
-			break;
-		}
-		break;
-	case 2:
-		// X..X
-		// XX..
-		// X.X.
-		// .X.X
-		// ..XX
-		// .XX.
-	{
-		if (LeastDeltaBetweenHumanMoves == 1)
-		{
-			// the two X's are next to each other
-			// XX..
-			// .XX.
-			// ..XX
-			if (HasHuman[0])
-			{
-				assert(IsTakeable(Board, LineLocX[2], LineLocY[2]));
-				printf("There are 2 human pieces, picking col %d\n", LineLocX[0] + 1);
-				UseSpot = 2;
-			}
-			else if (HasHuman[3])
-			{
-				assert(IsTakeable(Board, LineLocX[1], LineLocY[1]));
-				printf("There are 2 human pieces, picking col %d\n", LineLocX[3] + 1);
-				UseSpot = 2;
-			}
-			else
-			{
-				if (IsTakeable(Board, LineLocX[0], LineLocY[0]))
-				{
-					printf("There are 2 human pieces, picking col %d\n", LineLocX[0] + 1);
-					UseSpot = 0;
-				}
-				else if (IsTakeable(Board, LineLocX[3], LineLocY[3]))
-				{
-					printf("There are 2 human pieces, picking col %d\n", LineLocX[3] + 1);
-					UseSpot = 3;
-				}
-				else
-				{
-					assert(false);
-				}
-			}
-		}
-		else if (LeastDeltaBetweenHumanMoves == 2)
-		{
-			// X.X.
-			// .X.X
-			// in the middle
-			if (HasHuman[0])
-			{
-				assert(IsTakeable(Board, LineLocX[1], LineLocY[1]));
-				printf("There are 2 human pieces sep by 1 space, picking col %d\n", LineLocX[1] + 1);
-				UseSpot = 1;
-			}
-			else
-			{
-				assert(IsTakeable(Board, LineLocX[2], LineLocY[2]));
-				printf("There are 2 human pieces sep by 1 space, picking col %d\n", LineLocX[2] + 1);
-				UseSpot = 2;
-			}
-		}
-		else
-		{
-			// X..X
-			if (IsTakeable(Board, LineLocX[1], LineLocY[1]))
-			{
-				printf("There are 2 human pieces sep by 2 spaces, picking col %d\n", LineLocX[1] + 1);
-				UseSpot = 1;
-			}
-			else if (IsTakeable(Board, LineLocX[2], LineLocY[2]))
-			{
-				printf("There are 2 human pieces sep by 2 spaces, picking col %d\n", LineLocX[2] + 1);
-				UseSpot = 2;
-			}
-			else
-			{
-				assert(false);
-			}
-		}
-		break;
-	} // case 2
-	case 3:
-	{
-		// XXX.
-		// XX.X
-		// X.XX
-		// .XXX
-		// take the one with the hole in it
-		int NotTaken = -1;
-		for (int i = 0; i < 4; i++)
-		{
-			if (!HasHuman[i])
-			{
-				NotTaken = i;
-				break;
-			}
-		}
-		if (IsTakeable(Board, LineLocX[NotTaken], LineLocY[NotTaken]))
-		{
-			printf("There are 3 human pieces and one hole at col %d\n", LineLocX[UseSpot] + 1);
-			UseSpot = NotTaken;
-		}
-		else
-		{
-			assert(false);
-		}
-		break;
-	} // case 3
-	} // switch
-
-	int colPick = LineLocX[UseSpot];
-	printf("picking column %d\n", colPick + 1);
-	return colPick;
-}
-
 // only the two following functions have any brains in them...
-
-// recursive function. Can be called to make a play for USER or OPPONENT. It's point is to find:
-// 1: shortest path to a win for OPPONENT without USER winning first
+// This function tries EVERYTHING under it, and calculates the win and loss rate for every column
+// at the current (depth) layer, and then recursively calls itself for each sub-column. Keeps the win/loss
+// stats per column value, which is evaluated by the first caller of this function
 
 void TryRecursiveColumn(
 	PlayerType Board[GRIDHEIGHT][GRIDWIDTH], 
@@ -723,7 +325,7 @@ void TryRecursiveColumn(
 {
 	*MovesSearched = *MovesSearched + 1;
 
-	// if we've gone recursive too many times, we're done.
+	// if we've gone recursive too many times, we're done. Set this as high as you feel like it
 
 	if (CurrentDepth == LOOKAHEAD_MOVES) // both players move 4 times
 	{
@@ -739,34 +341,31 @@ void TryRecursiveColumn(
 
 	for (int x = 0; x < GRIDWIDTH; x++)
 	{
+		// don't try already filled columns
+
 		int rowsFilled = HowManyRowsFilled(BoardCopy, x);
 		if (rowsFilled == GRIDHEIGHT)
 		{
 			continue;
 		}
 
-		// for each try that is open to try, set it, test it recursively, then afterwards, erase it
-		// before we try the next column
+		// temporarily set this column with the piece of the current player
 
 		BoardCopy[rowsFilled][x] = WhichPlayer;
 
-		// mark that we went this way. Keep a breadcrumb trail of where we went.
-
-		assert(CurrentDepth <= LOOKAHEAD_MOVES);
+		// see if this player won
 
 		PlayerType WhoWon = Any4InARow(BoardCopy, false, NULL, NULL, NULL, NULL);
-
-		int CurrentDepthMoves = CurrentDepth + 1;
 
 		ColStats colStatsLocal[GRIDWIDTH] = { 0 };
 
 		if (WhoWon == OPPONENT)
 		{
-			colStatsLocal[x].TotalWins++;
+			colStatsLocal[x].TotalWins = 1;
 		}
 		else if (WhoWon == HUMAN)
 		{
-			colStatsLocal[x].TotalLosses++;
+			colStatsLocal[x].TotalLosses = 1;
 		}
 		else
 		{
@@ -778,7 +377,8 @@ void TryRecursiveColumn(
 				CurrentDepth + 1, MovesSearched);
 		}
 
-		// add our local totals to the parent's totals
+		// add the recursive win/loss stats to the current column.
+		// if we're the 0th try, put it into the parent column, we're about to return
 
 		if (CurrentDepth != 0)
 		{
@@ -789,6 +389,8 @@ void TryRecursiveColumn(
 		{
 			colStats[x] = colStatsLocal[x];
 		}
+
+		// remember to unset the piece we temporarily set AFTER doing all the recursive calls for this column
 
 		BoardCopy[rowsFilled][x] = EMPTY;
 	}
@@ -812,7 +414,9 @@ int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
 
 	printf("Searched %d moves\n\n", MovesSearched);
 
-	// which column has the best stats?
+	// which column has the best win/loss statistics? This is EASY
+	// if you want to randomize the game a bit, you could pick the 2nd best guess once in a while?
+
 	float bestwinratio = 0;
 	int bestcol = -1;
 
