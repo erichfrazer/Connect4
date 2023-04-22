@@ -14,12 +14,25 @@ int main(int argc, const char* argv[])
 		}
 	}
 
+	int LookAhead = 0;
+	do
+	{
+		printf("How many moves do you want the computer to look ahead? Pick between 2-10, anything over 8 is nuts:");
+		scanf("%d", &LookAhead);
+		if (LookAhead < 2 || LookAhead > 10)
+		{
+			printf("Bad lookahead. try again\n");
+		}
+	} while (LookAhead < 2 || LookAhead > 10);
+	LookaheadMoves = LookAhead;
+
 	while (true)
 	{
 		PrintGrid(TheBoard);
+		
 		int x = GetUserPlayColumn(TheBoard);
-		DropPiece(TheBoard, x, HUMAN);
-		PlayerType ptWon = Any4InARow(TheBoard, true, NULL, NULL, NULL, NULL);
+		int row = DropPiece(TheBoard, x, HUMAN);
+		PlayerType ptWon = Any4InARowAtLoc(TheBoard, HUMAN, true, x, row);
 		if (ptWon != EMPTY)
 		{
 			PrintGrid(TheBoard);
@@ -30,11 +43,14 @@ int main(int argc, const char* argv[])
 		PrintGrid(TheBoard);
 
 		x = GetOpponentPlayColumn(TheBoard);
-		DropPiece(TheBoard, x, OPPONENT);
-		ptWon = Any4InARow(TheBoard, true, NULL, NULL, NULL, NULL);
+		row = DropPiece(TheBoard, x, OPPONENT);
+		ptWon = Any4InARowAtLoc(TheBoard, OPPONENT, true, x, row);
 		if (ptWon != EMPTY)
 		{
 			PrintGrid(TheBoard);
+
+			DisplayYouLose();
+
 			printf("Opponent won!\n");
 			break;
 		}
@@ -44,7 +60,7 @@ int main(int argc, const char* argv[])
 	return 0;
 }
 
-const char* PieceString[5][5] = {
+const char* PieceString[6][5] = {
 	{
 		"         ",
 		"         ",
@@ -78,6 +94,13 @@ const char* PieceString[5][5] = {
 		" //WIN\\\\ ",
 		"|| OOO ||",
 		" \\\\WIN// ",
+		"   ---   "
+	},
+	{
+		"   ___   ",
+		" //???\\\\ ",
+		"|| ??? ||",
+		" \\\\???// ",
 		"   ---   "
 	}
 };
@@ -139,148 +162,84 @@ int GetUserPlayColumn(PlayerType Board[][GRIDWIDTH])
 	}
 }
 
-void DropPiece(PlayerType Board[][GRIDWIDTH], int Column, PlayerType Player)
+int DropPiece(PlayerType Board[][GRIDWIDTH], int Column, PlayerType Player)
 {
 	int r = HowManyRowsFilled(Board, Column);
 	Board[r][Column] = Player;
+	return r;
 }
 
-PlayerType Any4InARow(PlayerType Board[][GRIDWIDTH], bool MarkIfWin, int* xStart, int* yStart, int* xDir, int* yDir)
+PlayerType Any4InARowAtLoc(
+	PlayerType Board[][GRIDWIDTH], 
+	PlayerType WhichPlayer,
+	bool MarkIfWin,
+	int xStart, int yStart)
 {
-	// from each spot, only look up and right
-	// since we're going to look up, make sure the loop bounds are correct
+	// from each spot, look in each of 4 directions, both ways, and see how long the line can go
+	int dirx[4] = { 1, 1, 1, 0 }; // right-down, right, right-up, and up
+	int diry[4] = { -1, 0, 1, 1 };
 
-	bool Found4 = false;
-	int XWinStartLoc, YWinStartLoc, XWinDirection, YWinDirection;
-
-	PlayerType StartingValue;
-
-	for (int y = 0; y <= GRIDHEIGHT - 4; y++)
+	for (int dir = 0; dir < 4; dir++)
 	{
-		for (int x = 0; x <= GRIDWIDTH - 4; x++)
+		int forward_len = 1;
+		for ( ; ; forward_len++)
 		{
-			StartingValue = (PlayerType)Board[y][x];
-			if (StartingValue == EMPTY)
+			int x = xStart + dirx[dir] * forward_len;
+			int y = yStart + diry[dir] * forward_len;
+			if (x >= GRIDWIDTH || y < 0 || y >= GRIDHEIGHT)
 			{
-				continue;
+				// when we find a non-match, back up
+				forward_len--;
+				break;
 			}
-
-			// go look in 3 directions from start
-
-			// look up
-
-			int FoundLen = 1;
-
-			for ( int len = 1 ; len <= 3; len++)
+			if (Board[y][x] != WhichPlayer)
 			{
-				PlayerType v2 = Board[y + len][x];
-				if (v2 != StartingValue)
-				{
-					break;
-				}
-				FoundLen = len + 1;
+				// when we find a non-match, back up
+				forward_len--;
+				break;
 			}
-
-			if (FoundLen == 4)
-			{
-				XWinStartLoc = x;
-				YWinStartLoc = y;
-				XWinDirection = 0;
-				YWinDirection = 1;
-				Found4 = true;
-				break; // out of X
-			}
-
-			// look diagonal up/right
-
-			FoundLen = 1;
-
-			for (int len = 1; len <= 3; len++)
-			{
-				PlayerType v2 = Board[y + len][x + len];
-				if (v2 != StartingValue)
-				{
-					break;
-				}
-				FoundLen = len + 1;
-			}
-
-			if (FoundLen == 4)
-			{
-				XWinStartLoc = x;
-				YWinStartLoc = y;
-				XWinDirection = 1;
-				YWinDirection = 1;
-				Found4 = true;
-				break; // out of X
-			}
-
-			// look right
-
-			FoundLen = 1;
-
-			for (int len = 1; len <= 3; len++)
-			{
-				PlayerType v2 = Board[y][x + len];
-				if (v2 != StartingValue)
-				{
-					break;
-				}
-				FoundLen = len + 1;
-			}
-
-			if (FoundLen == 4)
-			{
-				XWinStartLoc = x;
-				YWinStartLoc = y;
-				XWinDirection = 1;
-				YWinDirection = 0;
-				Found4 = true;
-				break; // out of X
-			}
-		} // for X
-
-		if (Found4)
-		{
-			break;
 		}
-	} // for y
-
-	if (!Found4)
-	{
-		return EMPTY; // no 4
-	}
-
-	// mark a win as being different piece types if told to
-
-	if (xStart != NULL)
-		*xStart = XWinStartLoc;
-	if (yStart != NULL)
-		*yStart = YWinStartLoc;
-	if (xDir != NULL)
-		*xDir = XWinDirection;
-	if (yDir != NULL)
-		*yDir = YWinDirection;
-
-	if (MarkIfWin)
-	{
-		int len = 4;
-		while (len--)
+		int reverse_len = 1;
+		for (; ; reverse_len++)
 		{
-			if (StartingValue == HUMAN)
+			int x = xStart - dirx[dir] * reverse_len;
+			int y = yStart - diry[dir] * reverse_len;
+			if (x < 0 || y < 0 || y >= GRIDHEIGHT)
 			{
-				Board[YWinStartLoc][XWinStartLoc] = HUMAN_WON;
+				// when we find a non-match, back up
+				reverse_len--;
+				break;
 			}
-			else if (StartingValue == OPPONENT)
+			if (Board[y][x] != WhichPlayer)
 			{
-				Board[YWinStartLoc][XWinStartLoc] = OPPONENT_WON;
+				// when we find a non-match, back up
+				reverse_len--;
+				break;
 			}
-			YWinStartLoc += YWinDirection;
-			XWinStartLoc += XWinDirection;
+		}
+		int TotalLen = forward_len + reverse_len + 1; // 1 = current player @ start pos xLoc, yLoc
+		if (TotalLen >= 4)
+		{
+			if (MarkIfWin)
+			{
+				for (int i = 0; i < 4; i++)
+				{
+					int x = xStart + dirx[dir] * (-reverse_len + i);
+					int y = yStart + diry[dir] * (-reverse_len + i);
+					int WhichPiece = Board[y][x];
+					if (WhichPiece == HUMAN)
+						Board[y][x] = HUMAN_WON;
+					else if (WhichPiece == OPPONENT)
+						Board[y][x] = OPPONENT_WON;
+					else
+						Board[y][x] = WRONG_PIECE;
+				}
+			}
+			return WhichPlayer;
 		}
 	}
 
-	return StartingValue;
+	return EMPTY;
 }
 
 int HowManyRowsFilled(PlayerType Board[][GRIDWIDTH], int Column)
@@ -292,7 +251,7 @@ int HowManyRowsFilled(PlayerType Board[][GRIDWIDTH], int Column)
 			return r;
 		}
 	}
-	return 4;
+	return GRIDHEIGHT;
 }
 
 bool IsTakeable(PlayerType Board[][GRIDWIDTH], int x, int y)
@@ -309,6 +268,19 @@ PlayerType GetOtherPlayer(PlayerType WhichPlayer)
 	if (WhichPlayer == HUMAN) return OPPONENT;
 	return HUMAN;
 }
+
+void DisplayYouLose()
+{
+	FILE* f = fopen("YouLose.txt", "r");
+	char buf[256];
+	while (!feof(f))
+	{
+		fgets(buf, 256, f);
+		printf(buf);
+	}
+	fclose(f);
+}
+
 
 // only the two following functions have any brains in them...
 // This function tries EVERYTHING under it, and calculates the win and loss rate for every column
@@ -327,7 +299,7 @@ void TryRecursiveColumn(
 
 	// if we've gone recursive too many times, we're done. Set this as high as you feel like it
 
-	if (CurrentDepth == LOOKAHEAD_MOVES) // both players move 4 times
+	if (CurrentDepth == LookaheadMoves) // both players move 4 times
 	{
 		return; // no win found for anybody
 	}
@@ -355,7 +327,7 @@ void TryRecursiveColumn(
 
 		// see if this player won
 
-		PlayerType WhoWon = Any4InARow(BoardCopy, false, NULL, NULL, NULL, NULL);
+		PlayerType WhoWon = Any4InARowAtLoc(BoardCopy, WhichPlayer, false, x, rowsFilled);
 
 		ColStats colStatsLocal[GRIDWIDTH] = { 0 };
 
@@ -412,16 +384,24 @@ int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
 		0,
 		&MovesSearched);
 
-	printf("Searched %d moves\n\n", MovesSearched);
-
 	// which column has the best win/loss statistics? This is EASY
 	// if you want to randomize the game a bit, you could pick the 2nd best guess once in a while?
 
 	float bestwinratio = 0;
 	int bestcol = -1;
 
+	// don't allow losses to be 0 and then divide by 0. Just add one to each one to make the stats even
 	for (int c = 0; c < GRIDWIDTH; c++)
 	{
+		ColStats[c].TotalLosses++;
+		ColStats[c].TotalWins++;
+	}
+
+	for (int c = 0; c < GRIDWIDTH; c++)
+	{
+		int rowsFilled = HowManyRowsFilled(Board, c);
+		if (rowsFilled == GRIDHEIGHT) continue;
+
 		float winratio = ColStats[c].TotalWins / (float)ColStats[c].TotalLosses;
 		if (winratio > bestwinratio)
 		{
@@ -429,6 +409,9 @@ int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
 			bestcol = c;
 		}
 	}
+
+	printf("Searched %d moves, computer picks spot: %d\n\n", MovesSearched, bestcol);
+
 	return bestcol;
 }
 
