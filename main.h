@@ -20,6 +20,18 @@ typedef enum
 	WRONG_PIECE
 } PlayerType;
 
+typedef struct _Grid
+{
+	PlayerType Player;
+	int PlayCount;
+} Grid;
+
+typedef struct _PathData
+{
+	PlayerType Player;
+	int Column;
+} PathData;
+
 typedef struct _ColStats
 {
 	int TotalWins;
@@ -30,28 +42,31 @@ typedef struct _ColStats
 #define GRIDHEIGHT 6
 int LookaheadMoves = 8;
 
-PlayerType TheBoard[GRIDHEIGHT][GRIDWIDTH];
-int Round = 1;
+Grid TheBoard[GRIDHEIGHT][GRIDWIDTH];
+ColStats TheColStats[GRIDWIDTH];
 
-void PrintGrid(PlayerType Board[][GRIDWIDTH]);
-int GetUserPlayColumn(PlayerType Board[][GRIDWIDTH]);
-int DropPiece(PlayerType Board[][GRIDWIDTH], int Column, PlayerType Player); // returns row
-int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH]);
+int PlayCount = 1;
+
+void PrintGrid(Grid Board[][GRIDWIDTH], PlayerType WhichPlayer);
+void PrintMiniGrid(Grid Board[][GRIDWIDTH]);
+int GetUserPlayColumn(Grid Board[][GRIDWIDTH]);
+int DropPiece(Grid Board[][GRIDWIDTH], int Column, PlayerType Player); // returns row
+int GetOpponentPlayColumn(Grid Board[][GRIDWIDTH]);
 PlayerType Any4InARowAtLoc(
-	PlayerType Board[][GRIDWIDTH],
+	Grid Board[][GRIDWIDTH],
 	PlayerType WhichPlayer,
 	bool MarkIfWin,
 	int x, int y); // starting loc
-int HowManyRowsFilled(PlayerType Board[][GRIDWIDTH], int Column);
-bool IsTakeable(PlayerType Board[][GRIDWIDTH], int x, int y);
+int HowManyRowsFilled(Grid Board[][GRIDWIDTH], int Column);
+bool IsTakeable(Grid Board[][GRIDWIDTH], int x, int y);
 PlayerType GetOtherPlayer(PlayerType WhichPlayer);
 void DisplayYouLose();
 
 // only smart routine
 void TryRecursiveColumn(
-	PlayerType Board[GRIDHEIGHT][GRIDWIDTH], 
+	Grid Board[GRIDHEIGHT][GRIDWIDTH],
 	PlayerType WhichPlayer,
-	int Column,
 	ColStats ColStats[GRIDWIDTH],
-	int CurrentDepth, 
+	int CurrentDepth,
+	PathData ColumnsTaken[],
 	int* MovesSearched);

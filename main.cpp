@@ -10,7 +10,8 @@ int main(int argc, const char* argv[])
 	{
 		for (int x = 0; x < GRIDWIDTH; x++)
 		{
-			TheBoard[y][x] = EMPTY;
+			TheBoard[y][x].Player = EMPTY;
+			TheBoard[y][x].PlayCount = -1;
 		}
 	}
 
@@ -28,28 +29,42 @@ int main(int argc, const char* argv[])
 
 	while (true)
 	{
-		PrintGrid(TheBoard);
+		PrintGrid(TheBoard, HUMAN);
 		
 		int x = GetUserPlayColumn(TheBoard);
 		int row = DropPiece(TheBoard, x, HUMAN);
 		PlayerType ptWon = Any4InARowAtLoc(TheBoard, HUMAN, true, x, row);
 		if (ptWon != EMPTY)
 		{
-			PrintGrid(TheBoard);
+			PrintGrid(TheBoard, HUMAN);
 			printf("Player won!\n");
 			break;
 		}
 
-		PrintGrid(TheBoard);
+		PrintGrid(TheBoard, OPPONENT);
 
 		x = GetOpponentPlayColumn(TheBoard);
+
+		printf("WINS  ");
+		for (int x = 0; x < GRIDWIDTH; x++)
+		{
+			printf("  %5d      ", TheColStats[x].TotalWins);
+		}
+		printf("\n");
+		printf("LOSSES");
+		for (int x = 0; x < GRIDWIDTH; x++)
+		{
+			printf("  %5d      ", TheColStats[x].TotalLosses);
+		}
+		printf("\n");
+
 		row = DropPiece(TheBoard, x, OPPONENT);
 		ptWon = Any4InARowAtLoc(TheBoard, OPPONENT, true, x, row);
 		if (ptWon != EMPTY)
 		{
-			PrintGrid(TheBoard);
-
 			DisplayYouLose();
+
+			PrintGrid(TheBoard, OPPONENT);
 
 			printf("Opponent won!\n");
 			break;
@@ -69,35 +84,35 @@ const char* PieceString[6][5] = {
 		"         "
 	},
 	{
-		"   ___   ",
+		"___   ",
+		" // y \\\\ ",
+		"|| you ||",
+		" \\\\ u // ",
+		"   ---   "
+	},
+	{
+		"___   ",
 		" //   \\\\ ",
-		"||  h  ||",
+		"||     ||",
 		" \\\\   // ",
 		"   ---   "
 	},
 	{
-		"   ___   ",
-		" // o \\\\ ",
-		"|| OOO ||",
-		" \\\\ o // ",
-		"   ---   "
-	},
-	{
-		"   ___   ",
+		"___   ",
 		" //WIN\\\\ ",
-		"||  h  ||",
+		"|| YOU ||",
 		" \\\\WIN// ",
 		"   ---   "
 	},
 	{
-		"   ___   ",
+		"___   ",
 		" //WIN\\\\ ",
-		"|| OOO ||",
+		"||     ||",
 		" \\\\WIN// ",
 		"   ---   "
 	},
 	{
-		"   ___   ",
+		"___   ",
 		" //???\\\\ ",
 		"|| ??? ||",
 		" \\\\???// ",
@@ -105,36 +120,44 @@ const char* PieceString[6][5] = {
 	}
 };
 
-void PrintGrid(PlayerType Board[][GRIDWIDTH])
+void PrintGrid(Grid Board[][GRIDWIDTH], PlayerType WhichPlayer)
 {
 	printf("\n");
-	printf("==========================================================================================================\n");
-	printf("== ROUND %3d  ============================================================================================\n", Round);
-	Round++;
-	printf("==========================================================================================================\n");
+	printf("     ==========================================================================================================\n");
+	printf("     == Play # %3d  ============================================================================================\n", PlayCount);
+	printf("     ==========================================================================================================\n");
 	for (int y = GRIDHEIGHT - 1; y >= 0; y--)
 	{
 		for (int y2 = 0; y2 < 5; y2++)
 		{
+			printf("     ");
 			printf("|| ");
 			for (int x = 0; x < GRIDWIDTH; x++)
 			{
-				int v = Board[y][x];
+				int v = Board[y][x].Player;
+				if (v != EMPTY)
+				{
+					if (y2 == 0)
+					{
+						printf("%3d", Board[y][x].PlayCount);
+					}
+				}
 				printf("%s || ", PieceString[v][y2]);
 			}
 
 			printf("\n");
 		}
-		printf("==========================================================================================================\n");
+		printf("     ==========================================================================================================\n");
 	}
+	printf("     ");
 	for (int x = 0; x < GRIDWIDTH; x++)
 	{
 		printf("       %d     ", x + 1);
 	}
-	printf("\n");
+	printf("\n\n");
 }
 
-int GetUserPlayColumn(PlayerType Board[][GRIDWIDTH])
+int GetUserPlayColumn(Grid Board[][GRIDWIDTH])
 {
 	int col;
 	while (true)
@@ -162,15 +185,17 @@ int GetUserPlayColumn(PlayerType Board[][GRIDWIDTH])
 	}
 }
 
-int DropPiece(PlayerType Board[][GRIDWIDTH], int Column, PlayerType Player)
+int DropPiece(Grid Board[][GRIDWIDTH], int Column, PlayerType Player)
 {
 	int r = HowManyRowsFilled(Board, Column);
-	Board[r][Column] = Player;
+	Board[r][Column].Player = Player;
+	Board[r][Column].PlayCount = PlayCount;
+	PlayCount++;
 	return r;
 }
 
 PlayerType Any4InARowAtLoc(
-	PlayerType Board[][GRIDWIDTH], 
+	Grid Board[][GRIDWIDTH], 
 	PlayerType WhichPlayer,
 	bool MarkIfWin,
 	int xStart, int yStart)
@@ -181,6 +206,10 @@ PlayerType Any4InARowAtLoc(
 
 	for (int dir = 0; dir < 4; dir++)
 	{
+		if (dir == 3)
+		{
+			int stop = 0;
+		}
 		int forward_len = 1;
 		for ( ; ; forward_len++)
 		{
@@ -192,7 +221,7 @@ PlayerType Any4InARowAtLoc(
 				forward_len--;
 				break;
 			}
-			if (Board[y][x] != WhichPlayer)
+			if (Board[y][x].Player != WhichPlayer)
 			{
 				// when we find a non-match, back up
 				forward_len--;
@@ -210,7 +239,7 @@ PlayerType Any4InARowAtLoc(
 				reverse_len--;
 				break;
 			}
-			if (Board[y][x] != WhichPlayer)
+			if (Board[y][x].Player != WhichPlayer)
 			{
 				// when we find a non-match, back up
 				reverse_len--;
@@ -220,19 +249,47 @@ PlayerType Any4InARowAtLoc(
 		int TotalLen = forward_len + reverse_len + 1; // 1 = current player @ start pos xLoc, yLoc
 		if (TotalLen >= 4)
 		{
+#if false
+			switch (dir)
+			{
+			case 0:
+				printf("Found 4 right-down\n");
+				break;
+			case 1:
+				printf("Found 4 horizontal\n");
+				break;
+			case 2:
+				printf("Found 4 right-up\n");
+				break;
+			case 3:
+				printf("Found 4 vertically\n");
+				break;
+
+			}
+			if (Board[3][0].Player == HUMAN && Board[3][0].PlayCount == 1 &&
+				Board[2][0].Player == OPPONENT && Board[2][0].PlayCount == 2 &&
+				Board[3][1].Player == HUMAN && Board[3][1].PlayCount == 3 &&
+				Board[2][1].Player == OPPONENT && Board[2][1].PlayCount == 4 )
+			{
+				int stop = 0;
+			}
+
+			PrintMiniGrid(Board);
+#endif
+
 			if (MarkIfWin)
 			{
 				for (int i = 0; i < 4; i++)
 				{
 					int x = xStart + dirx[dir] * (-reverse_len + i);
 					int y = yStart + diry[dir] * (-reverse_len + i);
-					int WhichPiece = Board[y][x];
+					int WhichPiece = Board[y][x].Player;
 					if (WhichPiece == HUMAN)
-						Board[y][x] = HUMAN_WON;
+						Board[y][x].Player = HUMAN_WON;
 					else if (WhichPiece == OPPONENT)
-						Board[y][x] = OPPONENT_WON;
+						Board[y][x].Player = OPPONENT_WON;
 					else
-						Board[y][x] = WRONG_PIECE;
+						Board[y][x].Player = WRONG_PIECE;
 				}
 			}
 			return WhichPlayer;
@@ -242,11 +299,41 @@ PlayerType Any4InARowAtLoc(
 	return EMPTY;
 }
 
-int HowManyRowsFilled(PlayerType Board[][GRIDWIDTH], int Column)
+void PrintMiniGrid(Grid Board[][GRIDWIDTH])
+{
+	for (int xx = 0; xx < GRIDWIDTH + 2; xx++)
+	{
+		printf("----");
+	}
+	printf("\n");
+
+	for (int yy = GRIDHEIGHT - 1; yy >= 0; yy--)
+	{
+		printf("|");
+		for (int xx = 0; xx < GRIDWIDTH; xx++)
+		{
+			if (Board[yy][xx].Player == HUMAN)
+			{
+				printf("%2dH ", Board[yy][xx].PlayCount);
+			}
+			else if (Board[yy][xx].Player == OPPONENT)
+			{
+				printf("%2dO ", Board[yy][xx].PlayCount);
+			}
+			else
+			{
+				printf("    ");
+			}
+		}
+		printf("|\n");
+	}
+}
+
+int HowManyRowsFilled(Grid Board[][GRIDWIDTH], int Column)
 {
 	for (int r = 0; r < GRIDHEIGHT; r++)
 	{
-		if (Board[r][Column] == EMPTY)
+		if (Board[r][Column].Player == EMPTY)
 		{
 			return r;
 		}
@@ -254,12 +341,12 @@ int HowManyRowsFilled(PlayerType Board[][GRIDWIDTH], int Column)
 	return GRIDHEIGHT;
 }
 
-bool IsTakeable(PlayerType Board[][GRIDWIDTH], int x, int y)
+bool IsTakeable(Grid Board[][GRIDWIDTH], int x, int y)
 {
-	if (Board[y][x] != EMPTY) return false;
+	if (Board[y][x].Player != EMPTY) return false;
 	// the space is empty
 	if (y == 0) return true;
-	if (Board[y - 1][x] == EMPTY) return false;
+	if (Board[y - 1][x].Player == EMPTY) return false;
 	return true;
 }
 
@@ -288,26 +375,24 @@ void DisplayYouLose()
 // stats per column value, which is evaluated by the first caller of this function
 
 void TryRecursiveColumn(
-	PlayerType Board[GRIDHEIGHT][GRIDWIDTH], 
+	Grid Board[GRIDHEIGHT][GRIDWIDTH], 
 	PlayerType WhichPlayer,
-	int Column,
 	ColStats colStats[GRIDWIDTH],
 	int CurrentDepth,
+	PathData ColumnsTaken[],
 	int* MovesSearched)
 {
+	// the first time we're called, it's with a CurrentDepth of 0 and we need to try all OPPONENT moves from here.
+	// always add this up
+
 	*MovesSearched = *MovesSearched + 1;
 
 	// if we've gone recursive too many times, we're done. Set this as high as you feel like it
 
-	if (CurrentDepth == LookaheadMoves) // both players move 4 times
+	if (CurrentDepth == LookaheadMoves)
 	{
-		return; // no win found for anybody
+		return;
 	}
-
-	// make a copy of the board
-
-	PlayerType BoardCopy[GRIDHEIGHT][GRIDWIDTH];
-	memcpy(BoardCopy, Board, GRIDHEIGHT * GRIDWIDTH * sizeof(PlayerType));
 
 	PlayerType OtherPlayer = GetOtherPlayer(WhichPlayer);
 
@@ -315,19 +400,47 @@ void TryRecursiveColumn(
 	{
 		// don't try already filled columns
 
-		int rowsFilled = HowManyRowsFilled(BoardCopy, x);
+		int rowsFilled = HowManyRowsFilled(Board, x);
 		if (rowsFilled == GRIDHEIGHT)
 		{
 			continue;
 		}
 
-		// temporarily set this column with the piece of the current player
+		// temporarily set this column with the piece of the incoming player
 
-		BoardCopy[rowsFilled][x] = WhichPlayer;
+		Board[rowsFilled][x].Player = WhichPlayer;
+		Board[rowsFilled][x].PlayCount = PlayCount;
+		ColumnsTaken[CurrentDepth].Column = x;
+		ColumnsTaken[CurrentDepth].Player = WhichPlayer;
+		PlayCount++;
+
+		if (CurrentDepth == 5)
+			if (ColumnsTaken[0].Column == 2 && ColumnsTaken[0].Player == OPPONENT &&
+				ColumnsTaken[1].Column == 3 && ColumnsTaken[1].Player == HUMAN &&
+				ColumnsTaken[2].Column == 2 && ColumnsTaken[2].Player == OPPONENT &&
+				ColumnsTaken[3].Column == 3 && ColumnsTaken[3].Player == HUMAN &&
+				ColumnsTaken[4].Column == 2 && ColumnsTaken[4].Player == OPPONENT &&
+				ColumnsTaken[5].Column == 3 && ColumnsTaken[5].Player == HUMAN &&
+				true )
+			{
+				PrintMiniGrid(Board);
+				int Stop = 0;
+			}
+
+		if( CurrentDepth == 5 )
+			if (ColumnsTaken[0].Column == 3 && ColumnsTaken[0].Player == HUMAN &&
+				ColumnsTaken[1].Column == 2 && ColumnsTaken[0].Player == OPPONENT &&
+				ColumnsTaken[2].Column == 3 && ColumnsTaken[0].Player == HUMAN &&
+				ColumnsTaken[3].Column == 2 && ColumnsTaken[0].Player == OPPONENT &&
+				ColumnsTaken[4].Column == 3 && ColumnsTaken[0].Player == HUMAN )
+			{
+				PrintMiniGrid(Board);
+				int Stop = 0;
+			}
 
 		// see if this player won
 
-		PlayerType WhoWon = Any4InARowAtLoc(BoardCopy, WhichPlayer, false, x, rowsFilled);
+		PlayerType WhoWon = Any4InARowAtLoc(Board, WhichPlayer, false, x, rowsFilled);
 
 		ColStats colStatsLocal[GRIDWIDTH] = { 0 };
 
@@ -341,47 +454,50 @@ void TryRecursiveColumn(
 		}
 		else
 		{
+			// try the OTHER player, at every single column, with us having set that temp piece where it is
 			TryRecursiveColumn(
-				BoardCopy,
+				Board,
 				OtherPlayer,
-				x,
 				colStatsLocal,
-				CurrentDepth + 1, MovesSearched);
+				CurrentDepth + 1,
+				ColumnsTaken,
+				MovesSearched);
 		}
 
-		// add the recursive win/loss stats to the current column.
-		// if we're the 0th try, put it into the parent column, we're about to return
-
-		if (CurrentDepth != 0)
+		// we got win/loss stats for all the columns under us. We need to add those to our current column
+		
+		for (int i = 0; i < GRIDWIDTH; i++)
 		{
-			colStats[Column].TotalLosses += colStatsLocal[x].TotalLosses;
-			colStats[Column].TotalWins += colStatsLocal[x].TotalWins;
-		}
-		else
-		{
-			colStats[x] = colStatsLocal[x];
+			colStats[x].TotalLosses += colStatsLocal[i].TotalLosses;
+			colStats[x].TotalWins += colStatsLocal[i].TotalWins;
 		}
 
 		// remember to unset the piece we temporarily set AFTER doing all the recursive calls for this column
 
-		BoardCopy[rowsFilled][x] = EMPTY;
+		Board[rowsFilled][x].Player = EMPTY;
+		Board[rowsFilled][x].PlayCount = -1;
+		ColumnsTaken[CurrentDepth].Player = EMPTY; 
+		ColumnsTaken[CurrentDepth].Column = -1;
+
+		PlayCount--;
 	}
 
 	return;
 }
 
-int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
+int GetOpponentPlayColumn(Grid Board[][GRIDWIDTH])
 {
 	ColStats ColStats[GRIDWIDTH] = { 0 };
 
 	int MovesSearched = 0;
+	PathData ColumnsTaken[32];
 
 	TryRecursiveColumn(
 		Board,
 		OPPONENT,
-		0,
 		ColStats,
 		0,
+		ColumnsTaken,
 		&MovesSearched);
 
 	// which column has the best win/loss statistics? This is EASY
@@ -395,6 +511,7 @@ int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
 	{
 		ColStats[c].TotalLosses++;
 		ColStats[c].TotalWins++;
+		TheColStats[c] = ColStats[c];
 	}
 
 	for (int c = 0; c < GRIDWIDTH; c++)
@@ -410,7 +527,7 @@ int GetOpponentPlayColumn(PlayerType Board[][GRIDWIDTH])
 		}
 	}
 
-	printf("Searched %d moves, computer picks spot: %d\n\n", MovesSearched, bestcol);
+	printf("Searched %d moves, computer picks spot: %d\n", MovesSearched, bestcol + 1);
 
 	return bestcol;
 }
