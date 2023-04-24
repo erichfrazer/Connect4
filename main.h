@@ -41,6 +41,8 @@ typedef struct _ColStats
 #define GRIDWIDTH 8
 #define GRIDHEIGHT 6
 int LookaheadMoves = 8;
+float RandomPercent = 0.1f; // 10 percent
+
 
 Grid TheBoard[GRIDHEIGHT][GRIDWIDTH];
 ColStats TheColStats[GRIDWIDTH];

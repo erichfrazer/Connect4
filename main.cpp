@@ -48,13 +48,19 @@ int main(int argc, const char* argv[])
 		printf("WINS  ");
 		for (int x = 0; x < GRIDWIDTH; x++)
 		{
-			printf("  %5d      ", TheColStats[x].TotalWins);
+			printf("  %7d    ", TheColStats[x].TotalWins);
 		}
 		printf("\n");
 		printf("LOSSES");
 		for (int x = 0; x < GRIDWIDTH; x++)
 		{
-			printf("  %5d      ", TheColStats[x].TotalLosses);
+			printf("  %7d    ", TheColStats[x].TotalLosses);
+		}
+		printf("\n");
+		printf("RATIO ");
+		for (int x = 0; x < GRIDWIDTH; x++)
+		{
+			printf("  %7d    ", ( TheColStats[x].TotalWins + 1 ) * 10000 / (TheColStats[x].TotalLosses + 1 ));
 		}
 		printf("\n");
 
@@ -446,11 +452,31 @@ void TryRecursiveColumn(
 
 		if (WhoWon == OPPONENT)
 		{
-			colStatsLocal[x].TotalWins = 1;
+			long long WinWeight = pow(2, (GRIDHEIGHT - CurrentDepth));
+
+			// limit to size max int
+			if (WinWeight > INT_MAX)
+			{
+				WinWeight = INT_MAX;
+			}
+			colStatsLocal[x].TotalWins = WinWeight;
 		}
 		else if (WhoWon == HUMAN)
 		{
-			colStatsLocal[x].TotalLosses = 1;
+			// how many moves deep is this loss?
+			// what is the weight?
+			// need to weight the loss exponentially so that the computer gets "more and more worried"
+			// with a move by the human that is closer in terms of moves. If the user is going to definitely win in 
+			// 2 moves, then blocking that move is really important. Unless the win by the opponent happens in 1 move
+
+			long long LossWeight = pow(2, (GRIDHEIGHT-CurrentDepth));
+
+			// limit to size max int
+			if( LossWeight > INT_MAX )
+			{
+				LossWeight = INT_MAX;
+			}
+			colStatsLocal[x].TotalLosses = LossWeight;
 		}
 		else
 		{
@@ -527,8 +553,31 @@ int GetOpponentPlayColumn(Grid Board[][GRIDWIDTH])
 		}
 	}
 
-	printf("Searched %d moves, computer picks spot: %d\n", MovesSearched, bestcol + 1);
+	int ColChoices[GRIDWIDTH] = { 0 };
+	int ColChoicesCount = 0;
 
-	return bestcol;
+	for (int c = 0; c < GRIDWIDTH; c++)
+	{
+		int rowsFilled = HowManyRowsFilled(Board, c);
+		if (rowsFilled == GRIDHEIGHT) continue;
+
+		float winratio = ColStats[c].TotalWins / (float)ColStats[c].TotalLosses;
+
+		// if winratio is within X percent of bestwinratio, it's to be considered
+		float diff = fabs((winratio - bestwinratio) / bestwinratio);
+		if (diff <= RandomPercent)
+		{
+			printf("Column %d is being considered..\n", c + 1);
+			ColChoices[ColChoicesCount] = c;
+			ColChoicesCount++;
+		}
+	}
+
+	int r = rand() % ColChoicesCount;
+	int BestPossiblyRandomizedCol = ColChoices[r];
+
+	printf("Searched %d moves, best move is %d, computer picks spot: %d\n", MovesSearched, bestcol + 1, BestPossiblyRandomizedCol + 1);
+
+	return BestPossiblyRandomizedCol;
 }
 
